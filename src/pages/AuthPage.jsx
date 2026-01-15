@@ -24,7 +24,7 @@ const AuthPage = () => {
         return;
     }
 
-    const endpoint = isLogin ? 'http://localhost:5000/api/auth/login' : 'http://localhost:5000/api/auth/register';
+    const endpoint = isLogin ? 'https://collabix-frontend.onrender.com/api/auth/login' : 'https://collabix-frontend.onrender.com/api/auth/register';
     const payload = isLogin ? { username, password } : { username, email, password };
     
     try {
