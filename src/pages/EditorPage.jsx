@@ -203,7 +203,7 @@ const EditorPage = () => {
   // We strictly navigate to home without clearing local storage
   const leaveRoom = () => {
     if(socketRef.current) socketRef.current.disconnect();
-    reactNavigator('/home');
+    reactNavigator('/home', { replace: true });
     toast.success("Left the room");
   };
 
