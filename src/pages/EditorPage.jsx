@@ -199,6 +199,8 @@ const EditorPage = () => {
       socketRef.current.emit('kick-user', { roomId, targetSocketId });
   };
 
+  // --- FIXED LEAVE ROOM FUNCTION ---
+  // We strictly navigate to home without clearing local storage
   const leaveRoom = () => {
     if(socketRef.current) socketRef.current.disconnect();
     reactNavigator('/home');
