@@ -204,7 +204,7 @@ const EditorPage = () => {
           console.error("Failed to get audio", err); 
       }
 
-      socketRef.current = io('http://localhost:5000');
+      socketRef.current = io('https://collabix-backend.onrender.com/');
       
       socketRef.current.on('connect_error', (err) => {
         toast.error('Socket connection failed');
@@ -389,7 +389,7 @@ const EditorPage = () => {
   const downloadProject = async () => {
       const toastId = toast.loading("Bundling project...");
       try {
-          const response = await fetch(`http://localhost:5000/api/download/${roomId}`);
+          const response = await fetch(`https://collabix-backend.onrender.com/api/download/${roomId}`);
           if (!response.ok) throw new Error("Download failed");
           const blob = await response.blob();
           const url = window.URL.createObjectURL(blob);
