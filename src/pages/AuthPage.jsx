@@ -12,7 +12,8 @@ const AuthPage = () => {
 
   // 1. Auto-Redirect if already logged in
   useEffect(() => {
-    if (localStorage.getItem('userInfo')) {
+    // FIX: Check for 'user' instead of 'userInfo' to match HomePage
+    if (localStorage.getItem('user')) {
       navigate('/home');
     }
   }, [navigate]);
@@ -24,6 +25,7 @@ const AuthPage = () => {
         return;
     }
 
+    // Ensure this URL is your exact active Render Backend URL
     const endpoint = isLogin ? 'https://collabix-backend.onrender.com/api/auth/login' : 'https://collabix-backend.onrender.com/api/auth/register';
     const payload = isLogin ? { username, password } : { username, email, password };
     
@@ -31,9 +33,8 @@ const AuthPage = () => {
       const { data } = await axios.post(endpoint, payload);
       
       if (data.status) {
-        // 2. SAVE TO LOCAL STORAGE (Crucial Step)
-        // We save the entire user object (username, email, etc.)
-        localStorage.setItem('userInfo', JSON.stringify(data.user));
+        // FIX: Save as 'user' to match HomePage.jsx logic
+        localStorage.setItem('user', JSON.stringify(data.user));
         
         toast.success(isLogin ? "Welcome back!" : "Account created!");
         navigate('/home');
@@ -42,7 +43,7 @@ const AuthPage = () => {
       }
     } catch (error) {
       console.error(error);
-      toast.error("Something went wrong. Check server connection.");
+      toast.error(error.response?.data?.msg || "Something went wrong. Check server connection.");
     }
   };
 
