@@ -512,7 +512,7 @@ const EditorPage = () => {
         <div className="w-[1px] h-6 bg-gray-600"></div>
         <button onClick={() => {setIsRightPanelVisible(true); setActiveRightTab('chat'); setHasUnreadMsg(false);}} className="p-2 rounded-full bg-gray-700 hover:bg-gray-600 text-gray-200 transition relative group" title="Open Chat"><MessageSquare size={20} />{hasUnreadMsg && !isRightPanelVisible && <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border border-[#252526]"></span>}</button>
         <div className="w-[1px] h-6 bg-gray-600"></div>
-        <button onClick={handleLogout} className="p-2 rounded-full bg-red-500/10 text-red-500 hover:bg-red-600 hover:text-white transition group" title="Leave Room"><LogOut size={20} /></button>
+        <button onClick={leaveRoom} className="p-2 rounded-full bg-red-500/10 text-red-500 hover:bg-red-600 hover:text-white transition group" title="Leave Room"><LogOut size={20} /></button>
       </div>
     </div>
   );
