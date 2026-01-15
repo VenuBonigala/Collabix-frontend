@@ -199,11 +199,10 @@ const EditorPage = () => {
       socketRef.current.emit('kick-user', { roomId, targetSocketId });
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('user'); 
+  const leaveRoom = () => {
     if(socketRef.current) socketRef.current.disconnect();
-    reactNavigator('/auth');
-    toast.success("Logged out");
+    reactNavigator('/home');
+    toast.success("Left the room");
   };
 
   useEffect(() => {
