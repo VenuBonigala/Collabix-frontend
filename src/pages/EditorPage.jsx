@@ -8,7 +8,7 @@ import {
   PanelRightClose, PanelRightOpen, 
   Plus, Trash2, FolderPlus, Folder, File, ChevronRight, ChevronDown, 
   FolderOpen, Activity, Clock, MapPin, MapPinOff, 
-  Mic, MicOff, Download, Crown, XCircle, Copy // Added Copy Icon here
+  Mic, MicOff, Download, Crown, XCircle, Copy 
 } from 'lucide-react';
 import io from 'socket.io-client';
 import SimplePeer from 'simple-peer';
@@ -47,7 +47,7 @@ const buildFileTree = (files) => {
     return root;
 };
 
-// --- FILE TREE NODE (Fixed Crash Bug) ---
+// --- FILE TREE NODE ---
 const FileTreeNode = ({ node, level, activeFile, onSelect, onCreate, onDelete }) => {
     const isFolder = node.type === 'folder';
     const [isOpen, setIsOpen] = useState(false);
@@ -122,6 +122,18 @@ const EditorPage = () => {
   const monacoRef = useRef(null);
   const decorationsRef = useRef({});
 
+  // 1. RECOVER USERNAME (Handle Refresh & Direct Links)
+  const getSavedUser = () => {
+    try {
+        const savedUser = JSON.parse(localStorage.getItem('user'));
+        return location.state?.username || savedUser?.username;
+    } catch(e) {
+        return null;
+    }
+  };
+
+  const username = getSavedUser();
+
   // App State
   const [clients, setClients] = useState([]);
   const [activeFile, setActiveFile] = useState('');
@@ -165,7 +177,7 @@ const EditorPage = () => {
 
   const createPeer = (userToSignal, callerID, stream) => {
       const peer = new SimplePeer({ initiator: true, trickle: false, stream });
-      peer.on("signal", signal => { socketRef.current.emit("sending-signal", { userToSignal, callerID, signal, username: location.state?.username }); });
+      peer.on("signal", signal => { socketRef.current.emit("sending-signal", { userToSignal, callerID, signal, username }); });
       return peer;
   };
 
@@ -188,13 +200,16 @@ const EditorPage = () => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('userInfo'); 
+    localStorage.removeItem('user'); 
     if(socketRef.current) socketRef.current.disconnect();
-    reactNavigator('/');
+    reactNavigator('/auth');
     toast.success("Logged out");
   };
 
   useEffect(() => {
+    // 2. SAFETY CHECK: Don't initialize if no user (prevents crash)
+    if (!username) return;
+
     const init = async () => {
       let currentStream = null;
       try {
@@ -204,18 +219,18 @@ const EditorPage = () => {
           console.error("Failed to get audio", err); 
       }
 
-      socketRef.current = io('https://collabix-backend.onrender.com/');
+      socketRef.current = io('https://collabix-backend.onrender.com');
       
       socketRef.current.on('connect_error', (err) => {
         toast.error('Socket connection failed');
         reactNavigator('/');
       });
 
-      socketRef.current.emit('join-room', { roomId, username: location.state?.username });
+      socketRef.current.emit('join-room', { roomId, username });
 
-      socketRef.current.on('joined', ({ clients: roomClients, username, files: dbFiles, hostId: initialHostId }) => {
+      socketRef.current.on('joined', ({ clients: roomClients, username: joinedUser, files: dbFiles, hostId: initialHostId }) => {
         
-        if (username !== location.state?.username) { toast.success(`${username} joined.`); logActivity(`You joined the room`); }
+        if (joinedUser !== username) { toast.success(`${joinedUser} joined.`); logActivity(`You joined the room`); }
         setHostId(initialHostId);
         const uniqueClients = roomClients.filter((c, index, self) => index === self.findIndex((t) => t.socketId === c.socketId) && c.socketId !== socketRef.current.id);
         setClients(uniqueClients);
@@ -271,11 +286,11 @@ const EditorPage = () => {
           if (item) item.peer.signal(payload.signal);
       });
 
-      socketRef.current.on('user-joined', ({ username, socketId }) => {
+      socketRef.current.on('user-joined', ({ username: joinedUser, socketId }) => {
           if (socketId === socketRef.current.id) return;
-          toast.success(`${username} joined`);
-          setClients(prev => { if(prev.some(c => c.socketId === socketId)) return prev; return [...prev, { username, socketId }]; });
-          logActivity(`${username} joined`);
+          toast.success(`${joinedUser} joined`);
+          setClients(prev => { if(prev.some(c => c.socketId === socketId)) return prev; return [...prev, { username: joinedUser, socketId }]; });
+          logActivity(`${joinedUser} joined`);
       });
 
       socketRef.current.on('user-disconnected', ({ socketId, username }) => {
@@ -315,12 +330,15 @@ const EditorPage = () => {
         setPeers([]);
         if(stream) stream.getTracks().forEach(track => track.stop());
     };
-  }, []); 
+  }, []); // Keep empty dependency array
 
-  if (!location.state) return <Navigate to="/" />;
+  // 3. FORCE REDIRECT: If no user, redirect immediately instead of crashing
+  if (!username) {
+    return <Navigate to="/auth" />;
+  }
 
-  const handleEditorDidMount = (editor, monaco) => { editorRef.current = editor; monacoRef.current = monaco; editor.onDidChangeCursorPosition((e) => { if (isSharingLocationRef.current) { socketRef.current.emit('line-change', { roomId, lineNumber: e.position.lineNumber, fileName: activeFileRef.current, username: location.state?.username }); } }); };
-  const toggleLocationSharing = () => { const newState = !isSharingLocation; setIsSharingLocation(newState); if (newState) { toast.success("Location sharing ON"); if (editorRef.current) { const pos = editorRef.current.getPosition(); if(pos) { socketRef.current.emit('line-change', { roomId, lineNumber: pos.lineNumber, fileName: activeFileRef.current, username: location.state?.username }); } } } else { toast("Location sharing OFF", { icon: '🕵️' }); socketRef.current.emit('line-change', { roomId, lineNumber: -1, fileName: activeFileRef.current, username: location.state?.username }); } };
+  const handleEditorDidMount = (editor, monaco) => { editorRef.current = editor; monacoRef.current = monaco; editor.onDidChangeCursorPosition((e) => { if (isSharingLocationRef.current) { socketRef.current.emit('line-change', { roomId, lineNumber: e.position.lineNumber, fileName: activeFileRef.current, username }); } }); };
+  const toggleLocationSharing = () => { const newState = !isSharingLocation; setIsSharingLocation(newState); if (newState) { toast.success("Location sharing ON"); if (editorRef.current) { const pos = editorRef.current.getPosition(); if(pos) { socketRef.current.emit('line-change', { roomId, lineNumber: pos.lineNumber, fileName: activeFileRef.current, username }); } } } else { toast("Location sharing OFF", { icon: '🕵️' }); socketRef.current.emit('line-change', { roomId, lineNumber: -1, fileName: activeFileRef.current, username }); } };
   const handleCodeChange = (value) => { if (isRemoteUpdate.current) return; setFiles(prev => ({ ...prev, [activeFile]: { ...prev[activeFile], value } })); socketRef.current.emit('code-change', { roomId, fileName: activeFile, code: value }); };
   const handleCreate = (fileName, type) => { if (files[fileName]) return toast.error("Exists"); socketRef.current.emit('file-created', { roomId, fileName, type }); };
   const handleDelete = (fileName) => { if(window.confirm(`Delete ${fileName}?`)) socketRef.current.emit('file-deleted', { roomId, fileName }); };
@@ -339,50 +357,31 @@ const EditorPage = () => {
   
   const sendMessage = () => { 
       if (currentMsg.trim()) { 
-          socketRef.current.emit('send-message', { roomId, message: currentMsg, username: location.state?.username }); 
+          socketRef.current.emit('send-message', { roomId, message: currentMsg, username }); 
           setCurrentMsg(""); 
       }
   };
   
-  // --- UPDATED PREVIEW LOGIC ---
   const getSrcDoc = () => {
       if (!files || Object.keys(files).length === 0) return "";
-
-      // 1. Determine which HTML file to render
-      // Priority: Active File (if HTML) -> index.html -> First found HTML file
       let targetFileName = activeFile.endsWith('.html') ? activeFile : 'index.html';
-      
       if (!files[targetFileName]) {
           targetFileName = Object.keys(files).find(key => key.endsWith('.html'));
       }
-
-      // If no HTML file is found, return a placeholder
       if (!targetFileName || !files[targetFileName]) return '<div style="color:white; padding:20px;">No HTML file found</div>';
-
       let htmlContent = files[targetFileName].value;
-
-      // 2. Inject CSS (Replace <link href="..."> with <style>content</style>)
       const cssRegex = /<link[^>]+href=["']([^"']+)["'][^>]*>/g;
       htmlContent = htmlContent.replace(cssRegex, (match, href) => {
-          const cleanPath = href.replace(/^\.\//, ''); // Remove ./ if present
+          const cleanPath = href.replace(/^\.\//, '');
           const fileNode = files[cleanPath];
-          if (fileNode) {
-              return `<style>\n${fileNode.value}\n</style>`;
-          }
-          return match; 
+          return fileNode ? `<style>\n${fileNode.value}\n</style>` : match; 
       });
-
-      // 3. Inject JS (Replace <script src="..."> with <script>content</script>)
       const jsRegex = /<script[^>]+src=["']([^"']+)["'][^>]*><\/script>/g;
       htmlContent = htmlContent.replace(jsRegex, (match, src) => {
           const cleanPath = src.replace(/^\.\//, ''); 
           const fileNode = files[cleanPath];
-          if (fileNode) {
-              return `<script>\n${fileNode.value}\n</script>`;
-          }
-          return match;
+          return fileNode ? `<script>\n${fileNode.value}\n</script>` : match;
       });
-
       return htmlContent;
   };
   
@@ -409,7 +408,6 @@ const EditorPage = () => {
       }
   };
 
-  // --- NEW FUNCTION TO COPY ROOM ID ---
   const copyRoomId = async () => {
     try {
         await navigator.clipboard.writeText(roomId);
@@ -425,7 +423,6 @@ const EditorPage = () => {
       <nav className="h-14 bg-[#252526] border-b border-gray-700 flex items-center justify-between px-4 shrink-0">
         <div className="flex items-center gap-4">
             <span className="font-bold text-blue-500 text-lg">&lt;&gt;Collabix</span>
-            {/* UPDATED ROOM ID SECTION WITH BUTTON */}
             <div className="flex items-center gap-2">
                 <div className="text-xs text-gray-400 hidden sm:block">Room: {roomId}</div>
                 <button 
@@ -440,6 +437,7 @@ const EditorPage = () => {
         <div className="flex gap-2"><button onClick={runCode} className="flex items-center gap-2 bg-green-600 px-4 py-1 rounded hover:bg-green-700 text-sm font-bold"><Play size={16} /> Run Live</button></div>
         <div className="flex items-center gap-4"><button onClick={() => setIsRightPanelVisible(!isRightPanelVisible)} className="p-1.5 rounded hover:bg-gray-700">{isRightPanelVisible ? <PanelRightClose size={20} /> : <PanelRightOpen size={20} />}</button></div>
       </nav>
+      {/* ... Rest of your UI remains exactly the same ... */}
       <div className="flex-1 flex overflow-hidden">
         <aside className="w-60 bg-[#252526] border-r border-gray-700 flex flex-col shrink-0">
             <div className="flex-1 flex flex-col min-h-0">
@@ -479,7 +477,7 @@ const EditorPage = () => {
                 {activeRightTab === 'console' && (<div className="flex-1 bg-[#1e1e1e] p-4 font-mono text-sm overflow-y-auto"><div className="text-gray-500 mb-2 uppercase text-xs font-bold tracking-wider">Server Output</div>{isRunning && <div className="text-yellow-500 italic mb-2">Running...</div>}{consoleOutput.length === 0 && !isRunning && <div className="text-gray-600 italic">No output yet. Run your code!</div>}{consoleOutput.map((line, i) => (<div key={i} className={`${line.isError ? 'text-red-400' : 'text-green-400'} whitespace-pre-wrap mb-1`}>{line.text}</div>))}</div>)}
                 
                 {/* CHAT TAB */}
-                {activeRightTab === 'chat' && (<div className="flex-1 flex flex-col"><div className="flex-1 overflow-y-auto p-4 space-y-4">{messages.map((msg, i) => (<div key={i} className={`flex flex-col ${msg.username === location.state?.username ? 'items-end' : 'items-start'}`}><div className={`max-w-[85%] px-3 py-2 rounded-lg text-sm shadow-sm ${msg.username === location.state?.username ? 'bg-blue-600 text-white' : 'bg-[#37373d] text-gray-200'}`}>{msg.message}</div><span className="text-[10px] text-gray-500 mt-1">{msg.username}</span></div>))}</div><div className="p-3 bg-[#252526] border-t border-gray-700 flex gap-2"><input type="text" value={currentMsg} onChange={(e) => setCurrentMsg(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && sendMessage()} placeholder="Message..." className="flex-1 bg-[#1e1e1e] text-white text-sm rounded px-3 py-2 border border-gray-600 outline-none" /><button onClick={sendMessage} className="bg-blue-600 p-2 rounded text-white"><Send size={18} /></button></div></div>)}
+                {activeRightTab === 'chat' && (<div className="flex-1 flex flex-col"><div className="flex-1 overflow-y-auto p-4 space-y-4">{messages.map((msg, i) => (<div key={i} className={`flex flex-col ${msg.username === username ? 'items-end' : 'items-start'}`}><div className={`max-w-[85%] px-3 py-2 rounded-lg text-sm shadow-sm ${msg.username === username ? 'bg-blue-600 text-white' : 'bg-[#37373d] text-gray-200'}`}>{msg.message}</div><span className="text-[10px] text-gray-500 mt-1">{msg.username}</span></div>))}</div><div className="p-3 bg-[#252526] border-t border-gray-700 flex gap-2"><input type="text" value={currentMsg} onChange={(e) => setCurrentMsg(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && sendMessage()} placeholder="Message..." className="flex-1 bg-[#1e1e1e] text-white text-sm rounded px-3 py-2 border border-gray-600 outline-none" /><button onClick={sendMessage} className="bg-blue-600 p-2 rounded text-white"><Send size={18} /></button></div></div>)}
                 
                 {activeRightTab === 'participants' && (
                     <div className="p-4 space-y-4 overflow-y-auto">
@@ -488,16 +486,16 @@ const EditorPage = () => {
                             <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider">Connected Users</h3>
                             <div className="flex items-center justify-between bg-[#252526] p-2 rounded border border-gray-700">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold">{location.state?.username.slice(0,2).toUpperCase()}</div>
-                                    <span className="text-sm font-medium flex items-center gap-1">{location.state?.username} {hostId === socketRef.current?.id && <Crown size={12} className="text-yellow-400" />}</span>
+                                    <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold">{username?.slice(0,2).toUpperCase() || 'NA'}</div>
+                                    <span className="text-sm font-medium flex items-center gap-1">{username} {hostId === socketRef.current?.id && <Crown size={12} className="text-yellow-400" />}</span>
                                 </div>
                                 <span className="text-xs text-gray-500 italic">You</span>
                             </div>
                             {clients.map(client => (
                                 <div key={client.socketId} className="flex items-center justify-between bg-[#252526] p-2 rounded border border-gray-700">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold">{client.username.slice(0,2).toUpperCase()}</div>
-                                        <span className="text-sm font-medium flex items-center gap-1">{client.username} {hostId === client.socketId && <Crown size={12} className="text-yellow-400" />}</span>
+                                        <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold">{client.username?.slice(0,2).toUpperCase() || '??'}</div>
+                                        <span className="text-sm font-medium flex items-center gap-1">{client.username || 'Unknown'} {hostId === client.socketId && <Crown size={12} className="text-yellow-400" />}</span>
                                     </div>
                                     {hostId === socketRef.current?.id && (<button onClick={() => kickUser(client.socketId)} className="text-gray-500 hover:text-red-500 transition-colors" title="Remove User"><XCircle size={16} /></button>)}
                                 </div>
