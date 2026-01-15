@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+/* @tailwind base;
+@tailwind components;
+@tailwind utilities; */
+
+body {
+  margin: 0;
+  font-family: 'Inter', sans-serif;
+  background-color: #1e1e1e;
+  color: white;
+}
+
+
+/* ... existing code ... */
+
+/* Remote Cursors */
+.remote-cursor {
+  position: absolute;
+  pointer-events: none;
+  width: 2px !important;
+  height: 20px;
+  z-index: 10;
+}
+
+.remote-cursor-label {
+  position: absolute;
+  top: -18px;
+  left: -2px;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: white;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 20;
+}
+
+/* Remote Selection Highlight */
+.remote-selection {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+/* Remote Line Highlight - Bright Yellow */
+.remote-line-highlight {
+  background-color: rgba(255, 255, 0, 0.3) !important;
+  border-left: 4px solid #ffcc00 !important;
+}
