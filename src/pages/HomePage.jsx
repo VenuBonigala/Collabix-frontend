@@ -56,7 +56,8 @@ const HomePage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#1e1e1e] text-white">
+    <div className="min-h-screen flex items-center justify-center bg-[#1e1e1e] text-white flex-col">
+    <h5 className="text-2xl font-bold mb-6 text-center">Welcome back {UserName}</h5>
       <div className="bg-[#252526] p-8 rounded-xl max-w-md w-full border border-gray-700 shadow-xl">
         <h2 className="text-2xl font-bold mb-6 text-center">Join A Room</h2>
         <div className="flex flex-col gap-4">
